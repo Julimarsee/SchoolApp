@@ -128,13 +128,11 @@ namespace WpfApp2
             {
                 ButtonsStack.Visibility = Visibility.Collapsed;
                 ChangeStack.Visibility = Visibility.Collapsed;
-                ManageButton.Visibility = Visibility.Collapsed;
                 Grades.Margin = new Thickness(0, 24, 20, 0);
                 LoadStudentData();
             }
             else if (SaveData.role == "Учитель")
             {
-                ManageButton.Visibility = Visibility.Collapsed;
                 LoadTeacherData();
             }
             else if (SaveData.role == "Администратор")
@@ -323,11 +321,6 @@ namespace WpfApp2
             {
                 MessageBox.Show($"Ошибка при загрузке данных: {ex.Message}");
             }
-        }
-
-        private void ManageButton_Click(object sender, RoutedEventArgs e)
-        {
-            ((MainForm)Window.GetWindow(this)).OpenDist();
         }
     }
 }

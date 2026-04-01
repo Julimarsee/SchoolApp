@@ -98,6 +98,15 @@
                               Height="45" 
                               HorizontalAlignment="Stretch"/>
 
+                <ToggleButton x:Name="InformationButton" 
+                      Content="Справочник" 
+                      FontWeight="SemiBold" FontSize="14"
+                      Click="InfoButton_Click_1" 
+                      Style="{StaticResource NavToggleButton}"
+                      Margin="15,5,15,5" 
+                      Height="45" 
+                      HorizontalAlignment="Stretch"/>
+
                 <!-- Разделитель -->
                 <Rectangle Height="1" Fill="#E0E0E0" Margin="15,20,15,15"/>
 

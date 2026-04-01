@@ -55,7 +55,7 @@ namespace WpfApp2
 
         private void SetActiveButton(ToggleButton button)
         {
-            var buttons = new[] { AllGradesButton, DistGradeButton, AppointButton, ProfileButton, AddButton, InfoButton };
+            var buttons = new[] { AllGradesButton, DistGradeButton, AppointButton, ProfileButton, AddButton, InfoButton, InformationButton };
             foreach (var btn in buttons)
             {
                 if (btn != null)
@@ -142,5 +142,10 @@ namespace WpfApp2
 ");
         }
 
+        private void InfoButton_Click_1(object sender, RoutedEventArgs e)
+        {
+            View.Content = new Subjects();
+            SetActiveButton(InformationButton);
+        }
     }
 }
