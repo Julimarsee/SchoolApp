@@ -17,11 +17,13 @@ namespace WpfApp2
         }
 
         private database db = new database();
-        private List<string> teachers = new List<string>();
+        private List<int> teacherIds = new List<int>();
+        private List<string> teacherNames = new List<string>();
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
-            teachers.Clear();
+            teacherIds.Clear();
+            teacherNames.Clear();
 
             OffsetLabel.Visibility = Visibility.Collapsed;
             IsOffset.Visibility = Visibility.Collapsed;
@@ -31,161 +33,330 @@ namespace WpfApp2
                 NewSabText.Text = "Изменение дисциплины";
                 Save.Content = "Изменить";
                 Name.Text = SaveData.currentSub;
-                LoadCurrentTeachers();
+                LoadCurrentData();
             }
 
             ReturnButton.Visibility = SaveData.isNewProfile ? Visibility.Visible : Visibility.Collapsed;
 
-            var query = @"SELECT TRIM(CONCAT(p.last_name, ' ', p.first_name, ' ', COALESCE(p.patronymic, ''))) AS teacher_name
-            FROM person p
-            WHERE rights = 'Учитель'
-            ORDER BY p.last_name, p.first_name";
+            // Загрузка учителей
+            var query = @"SELECT person_id, 
+                          TRIM(CONCAT(p.last_name, ' ', p.first_name, ' ', COALESCE(p.patronymic, ''))) AS teacher_name
+                          FROM person p
+                          WHERE rights = 'Учитель'
+                          ORDER BY p.last_name, p.first_name";
 
             var teachersDB = db.ExecuteQuery(query);
             if (teachersDB != null)
             {
-                var teachersList = teachersDB.Cast<DataRowView>().Select(row => row["teacher_name"].ToString()).ToList();
+                var teachersList = new List<string>();
+                foreach (DataRowView row in teachersDB)
+                {
+                    teachersList.Add(row["teacher_name"].ToString());
+                }
                 Teachers.ItemsSource = teachersList;
             }
 
-            query = "SELECT * FROM class";
+            // Загрузка классов
+            query = "SELECT class_id, class_name FROM class ORDER BY class_name";
             var classesDB = db.ExecuteQuery(query);
             if (classesDB != null)
             {
-                List<string> groups = classesDB.Cast<DataRowView>().Select(row => row["class_name"].ToString()).ToList();
+                List<string> groups = new List<string>();
+                foreach (DataRowView row in classesDB)
+                {
+                    groups.Add(row["class_name"].ToString());
+                }
                 Groups.ItemsSource = groups;
             }
-
         }
 
-        private void LoadCurrentTeachers()
+        private void LoadCurrentData()
         {
             try
             {
-                string query = $@"
-                SELECT DISTINCT TRIM(CONCAT(p.last_name, ' ', p.first_name, ' ', COALESCE(p.patronymic, ''))) AS teacher_name
-                FROM class_subject_teacher cst
-                JOIN subject s ON cst.subject_id = s.subject_id
-                JOIN person p ON cst.teacher_id = p.person_id
-                WHERE s.title = '{SaveData.currentSub}'";
+                // Загружаем учителей для текущей дисциплины
+                string query = @"
+                    SELECT p.person_id, 
+                           TRIM(CONCAT(p.last_name, ' ', p.first_name, ' ', COALESCE(p.patronymic, ''))) AS teacher_name,
+                           c.class_name
+                    FROM class_subject_teacher cst
+                    JOIN subject s ON cst.subject_id = s.subject_id
+                    JOIN person p ON cst.teacher_id = p.person_id
+                    JOIN class c ON cst.class_id = c.class_id
+                    WHERE s.title = @subjectTitle";
 
-                var teachersDB = db.ExecuteQuery(query);
-                if (teachersDB != null)
+                var parameters = new NpgsqlParameter[]
                 {
-                    teachers.Clear();
-                    foreach (DataRowView row in teachersDB)
+                    new NpgsqlParameter("@subjectTitle", SaveData.currentSub)
+                };
+
+                var result = db.DataQuery(query, parameters);
+
+                if (result.Rows.Count > 0)
+                {
+                    // Сохраняем учителей
+                    foreach (DataRow row in result.Rows)
                     {
-                        string teacher = row["teacher_name"].ToString();
-                        if (!teachers.Contains(teacher))
+                        int teacherId = Convert.ToInt32(row["person_id"]);
+                        string teacherName = row["teacher_name"].ToString();
+
+                        if (!teacherIds.Contains(teacherId))
                         {
-                            teachers.Add(teacher);
+                            teacherIds.Add(teacherId);
+                            teacherNames.Add(teacherName);
                         }
                     }
+
+                    // Устанавливаем класс (берем первый, так как все записи для одной дисциплины должны иметь одинаковый класс)
+                    string className = result.Rows[0]["class_name"].ToString();
+                    Groups.SelectedItem = className;
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Ошибка загрузки учителей: {ex.Message}");
+                MessageBox.Show($"Ошибка загрузки данных: {ex.Message}");
             }
         }
 
         private void Save_Click(object sender, RoutedEventArgs e)
         {
             if (CheckError())
-            {
                 return;
-            }
 
-            bool isOffset = false;
-            string title = Name.Text.Trim();
-            string group = Groups.SelectedItem.ToString();
-            string listTeacher = string.Join("\n", teachers);
-
-            string action = SaveData.isChange ? "изменена" : "создана";
-            MessageBoxResult result = MessageBox.Show(
-                $"{char.ToUpper(action[0])}{action.Substring(1)} дисциплину \"{title}\"\n\nУчителя:\n{listTeacher}\n\nСпециальность: {group}",
-                "Подтверждение",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (result == MessageBoxResult.Yes)
+            try
             {
-                try
+                if (SaveData.isChange)
                 {
-                    if (SaveData.isChange)
+                    UpdateSubject();
+                }
+                else
+                {
+                    CreateSubject();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при сохранении: {ex.Message}", "Ошибка",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void CreateSubject()
+        {
+            using (var connection = db.GetConnection())
+            {
+                connection.Open();
+                using (var transaction = connection.BeginTransaction())
+                {
+                    try
                     {
-                        string deleteNotesQuery = $@"
-                            DELETE FROM notes 
-                            WHERE cst_id IN (
-                                SELECT cst_id 
-                                FROM class_subject_teacher cst
-                                JOIN subject s ON cst.subject_id = s.subject_id
-                                WHERE s.title = '{SaveData.currentSub}'
-                            )";
-                        db.ExecuteNonQuery(deleteNotesQuery);
+                        string subjectTitle = Name.Text.Trim();
+                        string className = Groups.SelectedItem.ToString();
 
-                        string deleteDailyNotesQuery = $@"
-                            DELETE FROM daily_notes 
-                            WHERE cst_id IN (
-                                SELECT cst_id 
-                                FROM class_subject_teacher cst
-                                JOIN subject s ON cst.subject_id = s.subject_id
-                                WHERE s.title = '{SaveData.currentSub}'
-                            )";
-                        db.ExecuteNonQuery(deleteDailyNotesQuery);
+                        // 1. Создаем предмет
+                        string insertSubjectQuery = @"
+                    INSERT INTO subject (title) 
+                    VALUES (@title) 
+                    RETURNING subject_id";
 
-                        string deleteCstQuery = $@"
-                            DELETE FROM class_subject_teacher 
-                            WHERE subject_id = (SELECT subject_id FROM subject WHERE title = '{SaveData.currentSub}')";
-                        db.ExecuteNonQuery(deleteCstQuery);
-
-                        string deleteSubjectQuery = $@"DELETE FROM subject WHERE title = '{SaveData.currentSub}'";
-                        db.ExecuteNonQuery(deleteSubjectQuery);
-                    }
-
-                    string insertSubjectQuery = @"
-                        INSERT INTO subject (title, subject_group)
-                        VALUES (@title, @group)";
-
-                    var subjectParams = new NpgsqlParameter[]
-                    {
-                        new NpgsqlParameter("@title", title),
-                        new NpgsqlParameter("@group", group)
-                    };
-
-                    db.ExecuteNonQuery(insertSubjectQuery, subjectParams);
-
-                    string getSubjectIdQuery = @"SELECT subject_id FROM subject WHERE title = @title";
-                    var subjectIdParam = new NpgsqlParameter("@title", title);
-                    var subjectResult = db.ExecuteQuery(getSubjectIdQuery, subjectIdParam);
-
-                    if (subjectResult != null && subjectResult.Count > 0)
-                    {
-                        int subjectId = Convert.ToInt32(subjectResult[0]["subject_id"]);
-
-                        if (teachers.Count > 0)
+                        int subjectId;
+                        using (var command = new NpgsqlCommand(insertSubjectQuery, connection, transaction))
                         {
-                            MessageBox.Show($"Дисциплина \"{title}\" успешно {action}!\n\n" +
-                                $"Назначенные учителя: {string.Join(", ", teachers)}\n\n" +
-                                "Не забудьте назначить учителей на конкретные классы на странице 'Назначить'",
-                                "Информация",
-                                MessageBoxButton.OK,
-                                MessageBoxImage.Information);
+                            command.Parameters.AddWithValue("@title", subjectTitle);
+                            subjectId = Convert.ToInt32(command.ExecuteScalar());
+                        }
+
+                        // 2. Получаем class_id
+                        string getClassIdQuery = "SELECT class_id FROM class WHERE class_name = @className";
+                        int classId;
+                        using (var command = new NpgsqlCommand(getClassIdQuery, connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@className", className);
+                            var result = command.ExecuteScalar();
+                            if (result == null)
+                            {
+                                throw new Exception("Класс не найден");
+                            }
+                            classId = Convert.ToInt32(result);
+                        }
+
+                        // 3. Для каждого учителя создаем связь класс-предмет-учитель
+                        foreach (string teacherName in teacherNames)
+                        {
+                            int teacherId = GetTeacherId(teacherName);
+                            if (teacherId == 0) continue;
+
+                            string insertCstQuery = @"
+                        INSERT INTO class_subject_teacher (class_id, subject_id, teacher_id)
+                        VALUES (@classId, @subjectId, @teacherId)";
+
+                            using (var command = new NpgsqlCommand(insertCstQuery, connection, transaction))
+                            {
+                                command.Parameters.AddWithValue("@classId", classId);
+                                command.Parameters.AddWithValue("@subjectId", subjectId);
+                                command.Parameters.AddWithValue("@teacherId", teacherId);
+                                command.ExecuteNonQuery();
+                            }
+                        }
+
+                        transaction.Commit();
+                        MessageBox.Show("Дисциплина успешно создана!", "Успех",
+                            MessageBoxButton.OK, MessageBoxImage.Information);
+
+                        // Возвращаемся на предыдущую страницу
+                        if (NavigationService != null && NavigationService.CanGoBack)
+                        {
+                            NavigationService.GoBack();
                         }
                     }
-
-                    ClearAll();
-
-                    if (SaveData.isChange)
+                    catch (Exception ex)
                     {
-                        SaveData.isChange = false;
-                        SaveData.currentSub = null;
+                        transaction.Rollback();
+                        throw new Exception($"Ошибка при создании дисциплины: {ex.Message}");
                     }
                 }
-                catch (Exception ex)
+            }
+        }
+
+        private void UpdateSubject()
+        {
+            using (var connection = db.GetConnection())
+            {
+                connection.Open();
+                using (var transaction = connection.BeginTransaction())
                 {
-                    MessageBox.Show($"Ошибка: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    try
+                    {
+                        string subjectTitle = Name.Text.Trim();
+                        string className = Groups.SelectedItem.ToString();
+
+                        // 1. Получаем subject_id
+                        string getSubjectIdQuery = "SELECT subject_id FROM subject WHERE title = @title";
+                        int subjectId;
+                        using (var command = new NpgsqlCommand(getSubjectIdQuery, connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@title", SaveData.currentSub);
+                            var result = command.ExecuteScalar();
+                            if (result == null)
+                            {
+                                throw new Exception("Дисциплина не найдена");
+                            }
+                            subjectId = Convert.ToInt32(result);
+                        }
+
+                        // 2. Если название изменилось, обновляем
+                        if (subjectTitle != SaveData.currentSub)
+                        {
+                            string updateSubjectQuery = "UPDATE subject SET title = @newTitle WHERE subject_id = @subjectId";
+                            using (var command = new NpgsqlCommand(updateSubjectQuery, connection, transaction))
+                            {
+                                command.Parameters.AddWithValue("@newTitle", subjectTitle);
+                                command.Parameters.AddWithValue("@subjectId", subjectId);
+                                command.ExecuteNonQuery();
+                            }
+                        }
+
+                        // 3. Получаем class_id
+                        string getClassIdQuery = "SELECT class_id FROM class WHERE class_name = @className";
+                        int classId;
+                        using (var command = new NpgsqlCommand(getClassIdQuery, connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@className", className);
+                            var result = command.ExecuteScalar();
+                            if (result == null)
+                            {
+                                throw new Exception("Класс не найден");
+                            }
+                            classId = Convert.ToInt32(result);
+                        }
+
+                        // 4. Удаляем старые связи
+                        string deleteCstQuery = "DELETE FROM class_subject_teacher WHERE subject_id = @subjectId";
+                        using (var command = new NpgsqlCommand(deleteCstQuery, connection, transaction))
+                        {
+                            command.Parameters.AddWithValue("@subjectId", subjectId);
+                            command.ExecuteNonQuery();
+                        }
+
+                        // 5. Создаем новые связи
+                        foreach (string teacherName in teacherNames)
+                        {
+                            int teacherId = GetTeacherId(teacherName);
+                            if (teacherId == 0) continue;
+
+                            string insertCstQuery = @"
+                        INSERT INTO class_subject_teacher (class_id, subject_id, teacher_id)
+                        VALUES (@classId, @subjectId, @teacherId)";
+
+                            using (var command = new NpgsqlCommand(insertCstQuery, connection, transaction))
+                            {
+                                command.Parameters.AddWithValue("@classId", classId);
+                                command.Parameters.AddWithValue("@subjectId", subjectId);
+                                command.Parameters.AddWithValue("@teacherId", teacherId);
+                                command.ExecuteNonQuery();
+                            }
+                        }
+
+                        transaction.Commit();
+                        MessageBox.Show("Дисциплина успешно обновлена!", "Успех",
+                            MessageBoxButton.OK, MessageBoxImage.Information);
+
+                        // Возвращаемся на предыдущую страницу
+                        if (NavigationService != null && NavigationService.CanGoBack)
+                        {
+                            NavigationService.GoBack();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        transaction.Rollback();
+                        throw new Exception($"Ошибка при обновлении дисциплины: {ex.Message}");
+                    }
                 }
+            }
+        }
+
+        private int GetTeacherId(string fullName)
+        {
+            try
+            {
+                string[] nameParts = ParseFIO(fullName);
+                if (nameParts == null) return 0;
+
+                string query = @"
+                    SELECT person_id 
+                    FROM person 
+                    WHERE last_name = @lastName 
+                    AND first_name = @firstName 
+                    AND rights = 'Учитель'";
+
+                var parameters = new List<NpgsqlParameter>
+                {
+                    new NpgsqlParameter("@lastName", nameParts[0]),
+                    new NpgsqlParameter("@firstName", nameParts[1])
+                };
+
+                if (nameParts.Length > 2 && !string.IsNullOrEmpty(nameParts[2]))
+                {
+                    query += " AND patronymic = @patronymic";
+                    parameters.Add(new NpgsqlParameter("@patronymic", nameParts[2]));
+                }
+                else
+                {
+                    query += " AND (patronymic IS NULL OR patronymic = '')";
+                }
+
+                var result = db.DataQuery(query, parameters.ToArray());
+                if (result.Rows.Count > 0)
+                {
+                    return Convert.ToInt32(result.Rows[0][0]);
+                }
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"GetTeacherId Error: {ex.Message}");
+                return 0;
             }
         }
 
@@ -193,9 +364,16 @@ namespace WpfApp2
         {
             Error.Visibility = Visibility.Collapsed;
 
-            if (string.IsNullOrWhiteSpace(Name.Text) || Groups.SelectedItem == null)
+            if (string.IsNullOrWhiteSpace(Name.Text))
             {
-                Error.Text = "Заполните все обязательные поля!";
+                Error.Text = "Введите название дисциплины!";
+                Error.Visibility = Visibility.Visible;
+                return true;
+            }
+
+            if (Groups.SelectedItem == null)
+            {
+                Error.Text = "Выберите класс!";
                 Error.Visibility = Visibility.Visible;
                 return true;
             }
@@ -216,27 +394,9 @@ namespace WpfApp2
                 return true;
             }
 
-            if (teachers.Count == 0)
+            if (teacherNames.Count == 0)
             {
-                Error.Text = "Выберите хотя бы одного учителя!";
-                Error.Visibility = Visibility.Visible;
-                return true;
-            }
-
-            foreach (string teacher in teachers)
-            {
-                var parts = ParseFIO(teacher);
-                if (parts == null || parts.Length < 2)
-                {
-                    Error.Text = "Некорректное ФИО учителя!";
-                    Error.Visibility = Visibility.Visible;
-                    return true;
-                }
-            }
-
-            if (teachers.Count != teachers.Distinct().Count())
-            {
-                Error.Text = "Учитель выбран более одного раза!";
+                Error.Text = "Добавьте хотя бы одного учителя!";
                 Error.Visibility = Visibility.Visible;
                 return true;
             }
@@ -280,20 +440,20 @@ namespace WpfApp2
         {
             try
             {
-                string query = @"SELECT COUNT(*) FROM subject WHERE title = :title";
-                var parameter = new NpgsqlParameter("title", title);
+                string query = "SELECT COUNT(*) FROM subject WHERE title = @title";
+                var parameter = new NpgsqlParameter("@title", title);
 
-                var result = db.ExecuteQuery(query, parameter);
-                if (result != null && result.Count > 0 && result[0][0] != null)
+                var result = db.DataQuery(query, new[] { parameter });
+                if (result != null && result.Rows.Count > 0)
                 {
-                    int count = Convert.ToInt32(result[0][0]);
+                    int count = Convert.ToInt32(result.Rows[0][0]);
                     return count > 0;
                 }
                 return false;
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Ошибка проверки дисциплины: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"IsSubjectExists Error: {ex.Message}");
                 return true;
             }
         }
@@ -303,20 +463,14 @@ namespace WpfApp2
             Teachers.SelectedItem = null;
             Groups.SelectedItem = null;
             Name.Text = string.Empty;
-            teachers.Clear();
+            teacherIds.Clear();
+            teacherNames.Clear();
             Error.Visibility = Visibility.Collapsed;
         }
 
         private void Teachers_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (Teachers.SelectedItem != null)
-            {
-                string selectedTeacher = Teachers.SelectedItem.ToString();
-                if (!teachers.Contains(selectedTeacher))
-                {
-                    teachers.Add(selectedTeacher);
-                }
-            }
+            // Не добавляем автоматически, только по кнопке Add
         }
 
         private void Add_Click(object sender, RoutedEventArgs e)
@@ -324,9 +478,14 @@ namespace WpfApp2
             if (Teachers.SelectedItem != null)
             {
                 string selectedTeacher = Teachers.SelectedItem.ToString();
-                if (!teachers.Contains(selectedTeacher))
+                if (!teacherNames.Contains(selectedTeacher))
                 {
-                    teachers.Add(selectedTeacher);
+                    teacherNames.Add(selectedTeacher);
+                    int teacherId = GetTeacherId(selectedTeacher);
+                    if (teacherId != 0)
+                    {
+                        teacherIds.Add(teacherId);
+                    }
                     MessageBox.Show($"Учитель '{selectedTeacher}' добавлен в список", "Информация",
                         MessageBoxButton.OK, MessageBoxImage.Information);
                 }

@@ -29,7 +29,7 @@ namespace WpfApp2
             if (SaveData.role == "Ученик")
             {
                 ChoiceStack.Visibility = Visibility.Collapsed;
-                DistGrades.Margin = new Thickness(-300, 24, 20, 30);
+                DistGrades.Margin = new Thickness(-300, 24, 20, 0);
                 AddData.Visibility = Visibility.Collapsed;
                 LoadStudentData();
             }
@@ -315,7 +315,6 @@ namespace WpfApp2
 
             if (e.Key == Key.Enter)
             {
-                // Проверяем формат даты при нажатии Enter
                 if (textBox.Text.Length == 10 && textBox.Text.Contains("-"))
                 {
                     if (DateTime.TryParseExact(textBox.Text, "dd-MM-yyyy", null,
@@ -360,7 +359,6 @@ namespace WpfApp2
                     return;
                 }
 
-                // Добавляем новую колонку
                 currentTable.Columns.Add(dateString, typeof(string));
                 currentTable.Columns["Средняя оценка"].SetOrdinal(currentTable.Columns.Count - 1);
 
@@ -431,7 +429,7 @@ namespace WpfApp2
                                 // Вставляем новую запись
                                 string insertQuery = @"
                                     INSERT INTO daily_notes (visit_date, note, cst_id, fk_person_id)
-                                    VALUES (@date, '', @cstId, @personId)";
+                                    VALUES (@date, 'Н', @cstId, @personId)";
 
                                 var insertParams = new NpgsqlParameter[]
                                 {
@@ -443,7 +441,7 @@ namespace WpfApp2
                             }
 
                             // Инициализируем ячейку пустой строкой
-                            row[dateString] = "";
+                            row[dateString] = "Н";
                             successCount++;
                         }
                         catch (Exception ex)

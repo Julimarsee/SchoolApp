@@ -89,5 +89,10 @@ namespace WpfApp2
                 MessageBox.Show($"Ошибка сохранения: {ex.Message}");
             }
         }
+
+        public NpgsqlConnection GetConnection()
+        {
+            return new NpgsqlConnection(connectionString);
+        }
     }
 }

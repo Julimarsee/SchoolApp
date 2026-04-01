@@ -129,6 +129,7 @@ namespace WpfApp2
                 ButtonsStack.Visibility = Visibility.Collapsed;
                 ChangeStack.Visibility = Visibility.Collapsed;
                 ManageButton.Visibility = Visibility.Collapsed;
+                Grades.Margin = new Thickness(0, 24, 20, 0);
                 LoadStudentData();
             }
             else if (SaveData.role == "Учитель")
