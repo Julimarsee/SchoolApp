@@ -1,0 +1,145 @@
+﻿<Page x:Class="WpfApp2.Dist"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:WpfApp2"
+      mc:Ignorable="d" 
+      d:DesignHeight="700" d:DesignWidth="1200" MinHeight="600" MinWidth="900"
+      Title="Успеваемость" 
+      Loaded="Page_Loaded"
+      Background="White">
+
+    <Grid Background="White">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Заголовок страницы -->
+        <Border Grid.Row="0" Grid.ColumnSpan="2" Background="#090974" Height="80" CornerRadius="0,0,20,20">
+            <TextBlock Text="Успеваемость учеников" 
+                       FontSize="24" FontWeight="SemiBold" Foreground="White"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+
+        <!-- Левая панель с настройками -->
+        <StackPanel Grid.Row="1" Grid.Column="0" x:Name="ChoiceStack" Background="White" Margin="20,20,10,20">
+            <Border Background="#F5F5F5" CornerRadius="15" Padding="20" Margin="0,0,0,20"
+                    BorderBrush="#E0E0E0" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock FontWeight="SemiBold" FontSize="18" Foreground="#090974" 
+                               TextAlignment="Center" Margin="0,0,0,15">
+                        Выберите предмет:
+                    </TextBlock>
+                    <ComboBox Name="Dists" BorderBrush="#090974" 
+                              BorderThickness="2" FontSize="16" Foreground="#090974"
+                              SelectionChanged="DistGrades_SelectionChanged" 
+                              Height="40" Background="White">
+                    </ComboBox>
+                </StackPanel>
+            </Border>
+
+            <Border Background="#F5F5F5" CornerRadius="15" Padding="20" Margin="0,0,0,20"
+                    BorderBrush="#E0E0E0" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock x:Name="textChange" HorizontalAlignment="Center" 
+                               Foreground="#090974" FontSize="18" FontWeight="SemiBold" 
+                               Margin="0,0,0,15">
+                        Изменить таблицу
+                    </TextBlock>
+                    <ToggleButton x:Name="IsChange" Height="35" Width="35" 
+                                  HorizontalAlignment="Center" 
+                                  Style="{DynamicResource IsChangedStyle}" 
+                                  Click="IsChange_Click"/>
+                </StackPanel>
+            </Border>
+
+            <Border Background="#F5F5F5" CornerRadius="15" Padding="20" Margin="0,0,0,20"
+                    BorderBrush="#E0E0E0" BorderThickness="1">
+                <Button x:Name="Save" Height="45" Style="{StaticResource LongButton}" 
+                        local:ButtonStyleExtensions.NormalColor="#128C58"
+                        local:ButtonStyleExtensions.HoverColor="#47A27B" 
+                        local:ButtonStyleExtensions.PressedColor="#36D792"
+                        Foreground="White" FontWeight="SemiBold" FontSize="16" 
+                        Click="Save_Click">
+                    Сохранить
+                </Button>
+            </Border>
+
+            <Border Background="#F5F5F5" CornerRadius="15" Padding="20"
+                    BorderBrush="#E0E0E0" BorderThickness="1">
+                <StackPanel x:Name="butStack" Orientation="Horizontal" 
+                            HorizontalAlignment="Center">
+                    <Button x:Name="Delete" Height="40" Width="90" 
+                            Style="{StaticResource LongButton}" 
+                            local:ButtonStyleExtensions.NormalColor="#4F4FD9"
+                            local:ButtonStyleExtensions.HoverColor="#7B7BEC"
+                            local:ButtonStyleExtensions.PressedColor="#5555A3"
+                            Foreground="White" FontSize="14" FontWeight="SemiBold" 
+                            Click="Delete_Click">
+                        Удалить
+                    </Button>
+                    <Button x:Name="Change" Height="40" Width="90" 
+                            Style="{StaticResource LongButton}" 
+                            local:ButtonStyleExtensions.NormalColor="#3F92D2" 
+                            local:ButtonStyleExtensions.HoverColor="#0B61A4" 
+                            local:ButtonStyleExtensions.PressedColor="#25567B" 
+                            Margin="20,0,0,0" 
+                            Foreground="White" FontSize="14" FontWeight="SemiBold" 
+                            Click="Change_Click">
+                        Изменить
+                    </Button>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- Правая панель с таблицей -->
+        <DataGrid x:Name="DistGrades" Grid.Row="1" Grid.Column="1" 
+                  Margin="10,20,20,20" Style="{StaticResource DataGridStyle}" 
+                  ColumnHeaderStyle="{StaticResource Text}"
+                  CellEditEnding="DistGrades_CellEditEnding"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  CanUserReorderColumns="True"
+                  CanUserResizeColumns="True"
+                  CanUserSortColumns="True"
+                  AlternatingRowBackground="#F9F9F9"
+                  RowHeight="35"
+                  FontSize="14">
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Width="Auto">
+                    <DataGridTemplateColumn.Header>
+                        <Button Content="+" FontWeight="Bold" x:Name="AddData" 
+                                Foreground="White" Width="35" Height="35"
+                                local:ButtonStyleExtensions.NormalColor="#128C58"
+                                local:ButtonStyleExtensions.HoverColor="#47A27B" 
+                                local:ButtonStyleExtensions.PressedColor="#36D792"
+                                Click="Button_Click_1" 
+                                Style="{DynamicResource LongButton}"/>
+                    </DataGridTemplateColumn.Header>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn x:Name="DataStack" Width="Auto" Visibility="Collapsed">
+                    <DataGridTemplateColumn.Header>
+                        <StackPanel Margin="5">
+                            <TextBlock x:Name="TextData" Text="Введите дату" 
+                                       TextAlignment="Center" FontWeight="SemiBold" 
+                                       Foreground="#090974" Margin="0,0,0,5"/>
+                            <TextBox x:Name="InputData" Width="110" 
+                                     LostFocus="InputData_LostFocus" 
+                                     TextChanged="InputData_TextChanged" 
+                                     MaxLength="10"
+                                     PreviewTextInput="InputData_PreviewTextInput"
+                                     BorderBrush="#090974" BorderThickness="1"
+                                     FontSize="12" TextAlignment="Center"/>
+                        </StackPanel>
+                    </DataGridTemplateColumn.Header>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</Page>

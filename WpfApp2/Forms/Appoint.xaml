@@ -1,0 +1,117 @@
+﻿<Page x:Class="WpfApp2.Appoint"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:WpfApp2"
+      mc:Ignorable="d" 
+      d:DesignHeight="700" d:DesignWidth="800" MinHeight="600" MinWidth="700"
+      Title="Назначение учителей" 
+      Loaded="Page_Loaded"
+      Background="White">
+
+    <Grid Background="White">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Заголовок страницы -->
+        <Border Grid.Row="0" Background="#090974" Height="80" CornerRadius="0,0,20,20">
+            <TextBlock Text="Назначение учителей на предметы" 
+                       FontSize="24" FontWeight="SemiBold" Foreground="White"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+
+        <!-- Основной контент -->
+        <Grid Grid.Row="1" Margin="40,40,40,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Выбор класса -->
+            <Border Grid.Column="0" Background="White" CornerRadius="15" Padding="20" Margin="10" 
+                    BorderBrush="#090974" BorderThickness="2">
+                <StackPanel>
+                    <TextBlock Text="Класс" FontSize="20" FontWeight="SemiBold" 
+                               Foreground="#090974" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+                    <ComboBox x:Name="Classes" Height="45" FontSize="16" 
+                              Foreground="#090974" BorderBrush="#090974" BorderThickness="2"
+                              Background="White" SelectionChanged="Classes_SelectionChanged"
+                              DisplayMemberPath="ClassName" SelectedValuePath="ClassId"/>
+                    <TextBlock x:Name="ClassError" Text="Выберите класс" FontSize="12" Foreground="#D93D0C" 
+                               Visibility="Collapsed" Margin="0,5,0,0" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Выбор предмета -->
+            <Border Grid.Column="1" Background="White" CornerRadius="15" Padding="20" Margin="10"
+                    BorderBrush="#090974" BorderThickness="2">
+                <StackPanel>
+                    <TextBlock Text="Предмет" FontSize="20" FontWeight="SemiBold" 
+                               Foreground="#090974" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+                    <ComboBox x:Name="Subjects" Height="45" FontSize="16" 
+                              Foreground="#090974" BorderBrush="#090974" BorderThickness="2"
+                              Background="White" SelectionChanged="Subjects_SelectionChanged"/>
+                    <TextBlock x:Name="SubjectError" Text="Выберите предмет" FontSize="12" Foreground="#D93D0C" 
+                               Visibility="Collapsed" Margin="0,5,0,0" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Выбор учителя -->
+            <Border Grid.Column="2" Background="White" CornerRadius="15" Padding="20" Margin="10"
+                    BorderBrush="#090974" BorderThickness="2">
+                <StackPanel>
+                    <TextBlock Text="Учитель" FontSize="20" FontWeight="SemiBold" 
+                               Foreground="#090974" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+                    <ComboBox x:Name="Teachers" Height="45" FontSize="16" 
+                              Foreground="#090974" BorderBrush="#090974" BorderThickness="2"
+                              Background="White" SelectionChanged="Teachers_SelectionChanged"
+                              DisplayMemberPath="TeacherName" SelectedValuePath="TeacherId"/>
+                    <TextBlock x:Name="TeacherError" Text="Выберите учителя" FontSize="12" Foreground="#D93D0C" 
+                               Visibility="Collapsed" Margin="0,5,0,0" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Информационная панель -->
+        <Border Grid.Row="2" Background="#F5F5F5" CornerRadius="15" Margin="40,0,40,20" Padding="20"
+                BorderBrush="#E0E0E0" BorderThickness="1">
+            <StackPanel>
+                <TextBlock Text="Информация о назначении" FontSize="16" FontWeight="SemiBold" 
+                           Foreground="#090974" Margin="0,0,0,10"/>
+                <TextBlock x:Name="InfoText" Text="Выберите класс, предмет и учителя для назначения" 
+                           FontSize="14" Foreground="#666666" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Кнопки действий -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,40">
+            <Button x:Name="AppointButton" Width="280" Height="55" Margin="10" 
+                    Style="{StaticResource LongButton}"
+                    local:ButtonStyleExtensions.NormalColor="#128C58" 
+                    local:ButtonStyleExtensions.HoverColor="#47A27B" 
+                    local:ButtonStyleExtensions.PressedColor="#36D792"
+                    FontWeight="SemiBold" FontSize="18" Foreground="White" 
+                    Content="Назначить" Click="AppointButton_Click"/>
+            <Button x:Name="AddDist" Width="200" Height="55" Margin="10" 
+                    Style="{StaticResource LongButton}"
+                    local:ButtonStyleExtensions.NormalColor="#3F92D2" 
+                    local:ButtonStyleExtensions.HoverColor="#0B61A4" 
+                    local:ButtonStyleExtensions.PressedColor="#25567B"
+                    FontWeight="Normal" FontSize="14" Foreground="White" 
+                    Content="Новая дисциплина" Click="AddDist_Click"/>
+            <Button x:Name="AddProf" Width="200" Height="55" Margin="10" 
+                    Style="{StaticResource LongButton}"
+                    local:ButtonStyleExtensions.NormalColor="#3F92D2" 
+                    local:ButtonStyleExtensions.HoverColor="#0B61A4" 
+                    local:ButtonStyleExtensions.PressedColor="#25567B"
+                    FontWeight="Normal" FontSize="14" Foreground="White" 
+                    Content="Новый учитель" Click="AddProf_Click"/>
+        </StackPanel>
+    </Grid>
+</Page>

@@ -1,0 +1,81 @@
+﻿<Page x:Class="WpfApp2.Add"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:WpfApp2"
+      mc:Ignorable="d" 
+      d:DesignHeight="700" d:DesignWidth="800" MinHeight="600" MinWidth="700"
+      Title="Добавление"
+      Background="White"
+      Loaded="Page_Loaded">
+
+    <Grid Background="White">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Заголовок страницы -->
+        <Border Grid.Row="0" Background="#090974" Height="80" CornerRadius="0,0,20,20">
+            <TextBlock Text="Добавление данных" 
+                       FontSize="24" FontWeight="SemiBold" Foreground="White"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+
+        <!-- Инструкция -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="40,30,40,20">
+            <StackPanel>
+                <Border Background="#F5F5F5" CornerRadius="15" Padding="25" Margin="0,0,0,20"
+                        BorderBrush="#E0E0E0" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="Инструкция по добавлению" 
+                                   FontSize="18" FontWeight="SemiBold" 
+                                   Foreground="#090974" Margin="0,0,0,15"/>
+                        <TextBlock x:Name="InstructionText" TextWrapping="Wrap" 
+                                   FontSize="14" Foreground="#666666"
+                                   LineHeight="25"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Дополнительная информация -->
+                <Border Background="#F5F5F5" CornerRadius="15" Padding="25"
+                        BorderBrush="#E0E0E0" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="Важные замечания" 
+                                   FontSize="18" FontWeight="SemiBold" 
+                                   Foreground="#090974" Margin="0,0,0,15"/>
+                        <TextBlock TextWrapping="Wrap" FontSize="14" Foreground="#666666" LineHeight="25">
+                            <Run Text="• " Foreground="#D93D0C"/><Run Text="Дисциплина может преподаваться в нескольких классах разными учителями"/>
+                            <LineBreak/>
+                            <Run Text="• " Foreground="#D93D0C"/><Run Text="Один учитель может вести несколько дисциплин в разных классах"/>
+                            <LineBreak/>
+                            <Run Text="• " Foreground="#D93D0C"/><Run Text="В одном классе на одну дисциплину может быть назначен только один учитель"/>
+                            <LineBreak/>
+                            <Run Text="• " Foreground="#D93D0C"/><Run Text="Для работы с оценками необходимо сначала назначить учителя на предмет в классе"/>
+                            <LineBreak/>
+                            <Run Text="• " Foreground="#D93D0C"/><Run Text="При создании учителя выберите дисциплины, которые он будет вести"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Кнопки действий -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,40">
+            <Button x:Name="AddDist" Height="52" Width="263" Style="{StaticResource LongButton}" 
+                    local:ButtonStyleExtensions.NormalColor="#3F92D2" Click="AddDist_Click"
+                    local:ButtonStyleExtensions.HoverColor="#0B61A4"
+                    local:ButtonStyleExtensions.PressedColor="#25567B"
+                    FontWeight="SemiBold" FontSize="16" Foreground="White" 
+                    Content="Новая дисциплина"/>
+            <Button x:Name="AddProf" Height="52" Width="263" Margin="40,0,0,0" Style="{StaticResource LongButton}"
+                    local:ButtonStyleExtensions.NormalColor="#128C58" Click="AddProf_Click"
+                    local:ButtonStyleExtensions.HoverColor="#47A27B"
+                    local:ButtonStyleExtensions.PressedColor="#36D792"
+                    FontWeight="SemiBold" FontSize="16" Foreground="White" 
+                    Content="Новый профиль" />
+        </StackPanel>
+    </Grid>
+</Page>
