@@ -1,32 +1,12 @@
 ﻿using Npgsql;
 using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
 
 namespace WpfApp2
 {
-    /// <summary>
-    /// Конвертер для зачетов (не используется в новой версии, т.к. зачеты убраны)
-    /// </summary>
-    public class OffsetToBoolConverter : IValueConverter
-    {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            // В новой версии зачетов нет, всегда возвращаем false
-            return false;
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            return null;
-        }
-    }
-
     public partial class allGrades : Page
     {
         public allGrades()
@@ -37,175 +17,108 @@ namespace WpfApp2
         private bool isChange = true;
         private database db = new database();
 
-        public void SetData(DataTable dt, List<string> offsetColumns)
-        {
-            this.offsetColumns = offsetColumns ?? new List<string>();
-
-            Grades.ItemsSource = dt.DefaultView;
-            Grades.Columns.Clear();
-            Grades.AutoGenerateColumns = true;
-        }
-
-        private List<string> offsetColumns = new List<string>();
-
         private void Grades_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
         {
-            string columnHeader = e.Column.Header.ToString();
-
-            if (SaveData.role == "Учитель" && SaveData.subjects != null && SaveData.subjects.Any())
+            if (e.PropertyName == "StudentName" || e.PropertyName == "ClassName")
             {
-                if (columnHeader != "Ученик" && columnHeader != "Класс")
-                {
-                    bool isTeacherSubject = SaveData.subjects.Any(sub =>
-                        !string.IsNullOrEmpty(sub) && columnHeader.Contains(sub.Trim()));
-
-                    if (!isTeacherSubject)
-                    {
-                        e.Cancel = true;
-                        return;
-                    }
-                }
-            }
-
-            if (columnHeader == "Ученик" || columnHeader == "Класс")
-            {
-                e.Column.IsReadOnly = true;
                 return;
             }
 
+            if (e.PropertyType == typeof(string))
+            {
+                var textColumn = new DataGridTextColumn
+                {
+                    Header = e.Column.Header,
+                    Binding = new System.Windows.Data.Binding(e.PropertyName)
+                    {
+                        UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged
+                    }
+                };
+                e.Column = textColumn;
+            }
         }
 
-        private void IsChange_Click(object sender, RoutedEventArgs e) =>
+        private void IsChange_Click(object sender, RoutedEventArgs e)
+        {
             Grades.IsReadOnly = !Grades.IsReadOnly;
+        }
 
-        private void SaveButton_Click(object sender, RoutedEventArgs e) =>
+        private void SaveButton_Click(object sender, RoutedEventArgs e)
+        {
             MessageBox.Show("Данные сохранены");
+        }
 
         private void Grades_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
         {
-            if (e.EditAction != DataGridEditAction.Commit) return;
-
-            e.Cancel = true;
-
-            var column = e.Column as DataGridBoundColumn;
-            if (column == null || column.IsReadOnly) return;
-
-            var bindingPath = (column.Binding as Binding)?.Path.Path;
-            if (bindingPath == "Ученик" || bindingPath == "Класс") return;
-
-            string newGrade = null;
-
-            if (e.EditingElement is TextBox textBox)
+            if (e.EditAction == DataGridEditAction.Commit)
             {
-                newGrade = textBox.Text.Trim();
-                if (string.IsNullOrEmpty(newGrade))
+                var editedElement = e.EditingElement as TextBox;
+                if (editedElement != null)
                 {
-                    newGrade = null;
-                }
-                else
-                {
-                    if (!int.TryParse(newGrade, out int grade) || grade < 2 || grade > 5)
+                    string newValue = editedElement.Text;
+                    var dataRow = e.Row.Item as DataRowView;
+
+                    if (dataRow != null)
                     {
-                        MessageBox.Show("Ошибка: Оценка может быть только от 2 до 5");
-                        return;
+                        string studentName = dataRow["Ученик"].ToString();
+                        string className = dataRow["Класс"].ToString();
+                        string columnName = e.Column.Header.ToString();
+
+                        if (columnName != "Ученик" && columnName != "Класс")
+                        {
+                            SaveGradeToDatabase(studentName, className, columnName, newValue);
+                        }
                     }
                 }
-            }
-            else
-            {
-                return;
-            }
-
-            var row = e.Row.Item as DataRowView;
-            if (row != null)
-            {
-                string studentName = row["Ученик"].ToString();
-                string className = row["Класс"].ToString();
-                SaveGradeToDatabase(studentName, className, bindingPath, newGrade);
             }
         }
 
         public void SaveGradeToDatabase(string studentName, string className, string subjectTitle, string newGrade)
         {
-            bool isEmpty = string.IsNullOrWhiteSpace(newGrade);
-
-            string[] parts = studentName.Split(' ');
-            if (parts.Length < 2) return;
-
-            string lastName = parts[0];
-            string firstName = parts[1];
-            string patronymic = parts.Length > 2 ? parts[2] : null;
-
-            string getCstIdQuery = @"
-                SELECT cst.cst_id 
-                FROM class_subject_teacher cst
-                JOIN subject s ON cst.subject_id = s.subject_id
-                JOIN class c ON cst.class_id = c.class_id
-                WHERE s.title = @subjectTitle 
-                  AND c.class_name = @className";
-
-            var cstResult = db.ExecuteQuery(getCstIdQuery,
-                new NpgsqlParameter("subjectTitle", subjectTitle),
-                new NpgsqlParameter("className", className));
-
-            if (cstResult.Count == 0)
+            try
             {
-                MessageBox.Show($"Ошибка: Предмет '{subjectTitle}' не найден в классе '{className}'");
-                return;
+                string getIdsQuery = @"
+                    SELECT p.person_id, cst.cst_id
+                    FROM person p
+                    JOIN class_subject_teacher cst ON cst.class_id = (SELECT class_id FROM class WHERE class_name = @className)
+                        AND cst.subject_id = (SELECT subject_id FROM subject WHERE title = @subjectTitle)
+                    WHERE p.last_name || ' ' || p.first_name = @studentName
+                        AND p.rights = 'Ученик'";
+
+                var parameters = new NpgsqlParameter[]
+                {
+                    new NpgsqlParameter("@studentName", studentName),
+                    new NpgsqlParameter("@className", className),
+                    new NpgsqlParameter("@subjectTitle", subjectTitle)
+                };
+
+                DataTable result = db.DataQuery(getIdsQuery, parameters);
+
+                if (result.Rows.Count > 0)
+                {
+                    var row = result.Rows[0];
+                    int personId = Convert.ToInt32(row["person_id"]);
+                    int cstId = Convert.ToInt32(row["cst_id"]);
+
+                    string upsertQuery = @"
+                        INSERT INTO notes (note, cst_id, fk_person_id)
+                        VALUES (@note, @cstId, @personId)
+                        ON CONFLICT (fk_person_id, cst_id) 
+                        DO UPDATE SET note = @note";
+
+                    var upsertParams = new NpgsqlParameter[]
+                    {
+                        new NpgsqlParameter("@note", newGrade),
+                        new NpgsqlParameter("@cstId", cstId),
+                        new NpgsqlParameter("@personId", personId)
+                    };
+
+                    db.ExecuteNonQuery(upsertQuery, upsertParams);
+                }
             }
-
-            int cstId = Convert.ToInt32(cstResult[0]["cst_id"]);
-
-            string getPersonIdQuery = @"
-                SELECT person_id 
-                FROM person 
-                WHERE last_name = @last_name 
-                  AND first_name = @first_name 
-                  AND (patronymic = @patronymic OR (patronymic IS NULL AND @patronymic IS NULL))
-                  AND rights = 'Ученик'";
-
-            var personResult = db.ExecuteQuery(getPersonIdQuery,
-                new NpgsqlParameter("last_name", lastName),
-                new NpgsqlParameter("first_name", firstName),
-                new NpgsqlParameter("patronymic", (object)patronymic ?? DBNull.Value));
-
-            if (personResult.Count == 0)
+            catch (Exception ex)
             {
-                MessageBox.Show($"Ошибка: Ученик '{studentName}' не найден в базе данных");
-                return;
-            }
-
-            int personId = Convert.ToInt32(personResult[0]["person_id"]);
-
-            if (isEmpty)
-            {
-                string deleteSql = @"
-                    DELETE FROM notes 
-                    WHERE fk_person_id = @personId 
-                      AND cst_id = @cstId";
-
-                db.ExecuteNonQuery(deleteSql,
-                    new NpgsqlParameter("personId", personId),
-                    new NpgsqlParameter("cstId", cstId));
-
-                MessageBox.Show($"Оценка по предмету '{subjectTitle}' удалена");
-            }
-            else
-            {
-                int gradeValue = int.Parse(newGrade);
-
-                string insertSql = @"
-                    INSERT INTO notes (fk_person_id, cst_id, note)
-                    VALUES (@personId, @cstId, @note)
-                    ON CONFLICT (fk_person_id, cst_id)
-                    DO UPDATE SET note = EXCLUDED.note";
-
-                db.ExecuteNonQuery(insertSql,
-                    new NpgsqlParameter("personId", personId),
-                    new NpgsqlParameter("cstId", cstId),
-                    new NpgsqlParameter("note", gradeValue));
-
-                MessageBox.Show($"Оценка '{gradeValue}' по предмету '{subjectTitle}' сохранена");
+                MessageBox.Show($"Ошибка при сохранении оценки: {ex.Message}");
             }
         }
 
@@ -216,10 +129,198 @@ namespace WpfApp2
                 ButtonsStack.Visibility = Visibility.Collapsed;
                 ChangeStack.Visibility = Visibility.Collapsed;
                 ManageButton.Visibility = Visibility.Collapsed;
+                LoadStudentData();
             }
             else if (SaveData.role == "Учитель")
             {
                 ManageButton.Visibility = Visibility.Collapsed;
+                LoadTeacherData();
+            }
+            else if (SaveData.role == "Администратор")
+            {
+                LoadAdminData();
+            }
+        }
+
+        private void LoadAdminData()
+        {
+            try
+            {
+                string query = @"
+                    SELECT 
+                        p.last_name || ' ' || p.first_name as StudentName,
+                        c.class_name as ClassName,
+                        s.title as SubjectTitle,
+                        n.note as FinalGrade
+                    FROM person p
+                    CROSS JOIN class c
+                    CROSS JOIN subject s
+                    LEFT JOIN class_subject_teacher cst ON c.class_id = cst.class_id AND s.subject_id = cst.subject_id
+                    LEFT JOIN notes n ON n.cst_id = cst.cst_id AND n.fk_person_id = p.person_id
+                    WHERE p.rights = 'Ученик'
+                    ORDER BY c.class_name, p.last_name, p.first_name, s.title";
+
+                DataTable dt = db.DataQuery(query);
+
+                var resultTable = new DataTable();
+                resultTable.Columns.Add("Ученик", typeof(string));
+                resultTable.Columns.Add("Класс", typeof(string));
+
+                var subjects = dt.AsEnumerable()
+                    .Select(row => row["SubjectTitle"].ToString())
+                    .Distinct()
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .OrderBy(s => s)
+                    .ToList();
+
+                foreach (var subject in subjects)
+                {
+                    resultTable.Columns.Add(subject, typeof(string));
+                }
+
+                var students = dt.AsEnumerable()
+                    .GroupBy(row => new
+                    {
+                        StudentName = row["StudentName"].ToString(),
+                        ClassName = row["ClassName"].ToString()
+                    })
+                    .OrderBy(g => g.Key.ClassName)
+                    .ThenBy(g => g.Key.StudentName);
+
+                foreach (var student in students)
+                {
+                    var row = resultTable.NewRow();
+                    row["Ученик"] = student.Key.StudentName;
+                    row["Класс"] = student.Key.ClassName;
+
+                    foreach (var subject in subjects)
+                    {
+                        var grade = student.FirstOrDefault(s => s["SubjectTitle"].ToString() == subject);
+                        row[subject] = grade != null ? grade["FinalGrade"].ToString() : "";
+                    }
+
+                    resultTable.Rows.Add(row);
+                }
+
+                Grades.ItemsSource = resultTable.DefaultView;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при загрузке данных: {ex.Message}");
+            }
+        }
+
+        private void LoadTeacherData()
+        {
+            try
+            {
+                string query = @"
+            SELECT DISTINCT
+                p.last_name || ' ' || p.first_name as StudentName,
+                c.class_name as ClassName,
+                s.title as SubjectTitle,
+                n.note as FinalGrade
+            FROM person p
+            JOIN class_subject_teacher cst ON cst.teacher_id = @teacherId
+            JOIN class c ON cst.class_id = c.class_id
+            JOIN subject s ON cst.subject_id = s.subject_id
+            LEFT JOIN notes n ON n.cst_id = cst.cst_id AND n.fk_person_id = p.person_id
+            WHERE p.rights = 'Ученик'
+            ORDER BY ClassName, StudentName, SubjectTitle";
+
+                var parameters = new NpgsqlParameter[]
+                {
+            new NpgsqlParameter("@teacherId", Convert.ToInt32(SaveData.id))
+                };
+
+                DataTable dt = db.DataQuery(query, parameters);
+
+                var resultTable = new DataTable();
+                resultTable.Columns.Add("Ученик", typeof(string));
+                resultTable.Columns.Add("Класс", typeof(string));
+
+                var subjects = dt.AsEnumerable()
+                    .Select(row => row["SubjectTitle"].ToString())
+                    .Distinct()
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .OrderBy(s => s)
+                    .ToList();
+
+                foreach (var subject in subjects)
+                {
+                    resultTable.Columns.Add(subject, typeof(string));
+                }
+
+                var students = dt.AsEnumerable()
+                    .GroupBy(row => new
+                    {
+                        StudentName = row["StudentName"].ToString(),
+                        ClassName = row["ClassName"].ToString()
+                    })
+                    .OrderBy(g => g.Key.ClassName)
+                    .ThenBy(g => g.Key.StudentName);
+
+                foreach (var student in students)
+                {
+                    var row = resultTable.NewRow();
+                    row["Ученик"] = student.Key.StudentName;
+                    row["Класс"] = student.Key.ClassName;
+
+                    foreach (var subject in subjects)
+                    {
+                        var grade = student.FirstOrDefault(s => s["SubjectTitle"].ToString() == subject);
+                        row[subject] = grade != null ? grade["FinalGrade"].ToString() : "";
+                    }
+
+                    resultTable.Rows.Add(row);
+                }
+
+                Grades.ItemsSource = resultTable.DefaultView;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при загрузке данных: {ex.Message}");
+            }
+        }
+
+        private void LoadStudentData()
+        {
+            try
+            {
+                string query = @"
+            SELECT DISTINCT
+                s.title as SubjectTitle,
+                n.note as FinalGrade
+            FROM notes n
+            JOIN class_subject_teacher cst ON n.cst_id = cst.cst_id
+            JOIN subject s ON cst.subject_id = s.subject_id
+            WHERE n.fk_person_id = @studentId
+            ORDER BY s.title";
+
+                var parameters = new NpgsqlParameter[]
+                {
+            new NpgsqlParameter("@studentId", Convert.ToInt32(SaveData.id))
+                };
+
+                DataTable dt = db.DataQuery(query, parameters);
+
+                var resultTable = new DataTable();
+                resultTable.Columns.Add("Предмет", typeof(string));
+                resultTable.Columns.Add("Итоговая оценка", typeof(string));
+
+                foreach (DataRow row in dt.Rows)
+                {
+                    var newRow = resultTable.NewRow();
+                    newRow["Предмет"] = row["SubjectTitle"].ToString();
+                    newRow["Итоговая оценка"] = row["FinalGrade"].ToString();
+                    resultTable.Rows.Add(newRow);
+                }
+
+                Grades.ItemsSource = resultTable.DefaultView;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при загрузке данных: {ex.Message}");
             }
         }
 

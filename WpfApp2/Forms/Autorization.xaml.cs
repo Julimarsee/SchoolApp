@@ -1,11 +1,14 @@
 ﻿using Npgsql;
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 
 namespace WpfApp2
 {
+
     /// <summary>
     /// Логика взаимодействия для MainWindow.xaml
     /// </summary>
@@ -123,7 +126,6 @@ namespace WpfApp2
                 result = db.ExecuteQuery(query);
                 SaveData.id = result[0]["person_id"].ToString();
 
-                // Для учителя получаем список предметов, которые он ведет
                 if (role_from_db == "Учитель")
                 {
                     query = @"
@@ -146,8 +148,30 @@ namespace WpfApp2
                     foreach (string sub in SaveData.subjects)
                         Console.WriteLine(sub);
                 }
+                if (role_from_db == "Ученик")
+                {
+                    string getStudentClassQuery = @"
+                        SELECT c.class_name
+                        FROM person p
+                        JOIN class_subject_teacher cst ON cst.class_id IN (
+                            SELECT DISTINCT cst2.class_id 
+                            FROM class_subject_teacher cst2
+                        )
+                        JOIN class c ON cst.class_id = c.class_id
+                        WHERE p.person_id = @personId
+                        LIMIT 1";
 
-                // Получаем ФИО пользователя
+                    var parameters = new NpgsqlParameter[]
+                    {
+        new NpgsqlParameter("@personId", Convert.ToInt32(SaveData.id))
+                    };
+
+                    DataView classResult = db.ExecuteQuery(getStudentClassQuery, parameters);
+                    SaveData.studentClass = classResult != null && classResult.Count > 0
+                        ? classResult[0]["class_name"].ToString()
+                        : "";
+                }
+
                 query = "SELECT TRIM(CONCAT(p.last_name, ' ', p.first_name, ' ', COALESCE(p.patronymic, ''))) AS full_name " +
                         $"FROM person p WHERE p.person_id = {SaveData.id}";
                 result = db.ExecuteQuery(query);
@@ -156,6 +180,7 @@ namespace WpfApp2
                 Console.WriteLine(SaveData.id);
                 Console.WriteLine(SaveData.name);
                 Console.WriteLine(SaveData.role);
+                Console.WriteLine(SaveData.studentClass);
             }
         }
 
@@ -172,23 +197,33 @@ namespace WpfApp2
                 parolText.Visibility = Visibility.Collapsed;
                 PassText.Visibility = Visibility.Visible;
                 MaskText.Text = "➖";
+
+                PassText.Password = parolText.Text;
             }
             else
             {
                 parolText.Visibility = Visibility.Visible;
                 PassText.Visibility = Visibility.Collapsed;
                 MaskText.Text = "👁️‍🗨️";
+
+                parolText.Text = PassText.Password;
             }
         }
 
         private void PassText_PasswordChanged(object sender, RoutedEventArgs e)
         {
-            parolText.Text = PassText.Password;
+            if (parolText.Visibility == Visibility.Visible)
+            {
+                parolText.Text = PassText.Password;
+            }
         }
 
         private void parolText_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
-            PassText.Password = parolText.Text;
+            if (PassText.Visibility == Visibility.Visible)
+            {
+                PassText.Password = parolText.Text;
+            }
         }
     }
 }

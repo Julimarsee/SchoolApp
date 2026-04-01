@@ -1,32 +1,27 @@
 ﻿using Npgsql;
 using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Data.SqlClient;
-using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Markup;
-using System.Windows.Media;
 
 namespace WpfApp2
 {
     internal class database
     {
-        string connectionString = "host=localhost;port = 5432;database=school_db;username = postgres;password =12345;sslmode=prefer;timeout = 10";
+        string connectionString = "host=localhost;port=5432;database=school_db;username=postgres;password=12345;sslmode=prefer;timeout=10";
+
         public DataView ExecuteQuery(string query, params NpgsqlParameter[] parameters)
         {
             using (var connection = new NpgsqlConnection(connectionString))
-
             using (var command = new NpgsqlCommand(query, connection))
             {
                 try
                 {
-                    foreach(var param in parameters)
+                    if (parameters != null)
                     {
-                        command.Parameters.Add(param);
+                        foreach (var param in parameters)
+                        {
+                            command.Parameters.Add(param);
+                        }
                     }
 
                     connection.Open();
@@ -42,9 +37,8 @@ namespace WpfApp2
             }
         }
 
-        public DataTable DataQuery(string query)
+        public DataTable DataQuery(string query, params NpgsqlParameter[] parameters)
         {
-
             DataTable dt = new DataTable();
             try
             {
@@ -52,11 +46,19 @@ namespace WpfApp2
                 {
                     connection.Open();
                     using (var command = new NpgsqlCommand(query, connection))
+                    {
+                        if (parameters != null)
+                        {
+                            command.Parameters.AddRange(parameters);
+                        }
+
                         using (var adapter = new NpgsqlDataAdapter(command))
+                        {
                             adapter.Fill(dt);
+                        }
+                    }
                 }
             }
-
             catch (Exception ex)
             {
                 MessageBox.Show($"{ex.Message}");
@@ -75,9 +77,11 @@ namespace WpfApp2
                     connection.Open();
 
                     if (parameters != null && parameters.Length > 0)
+                    {
                         command.Parameters.AddRange(parameters);
+                    }
 
-                    int changed = command.ExecuteNonQuery();
+                    command.ExecuteNonQuery();
                 }
             }
             catch (Exception ex)
@@ -85,6 +89,5 @@ namespace WpfApp2
                 MessageBox.Show($"Ошибка сохранения: {ex.Message}");
             }
         }
-
     }
 }

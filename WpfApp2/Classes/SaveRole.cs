@@ -16,6 +16,7 @@ namespace WpfApp2
         public static string password;
         public static string currentSub;
         public static double currentWidth;
+        public static string studentClass;
 
         public static bool isChange = false;
         public static bool isNewProfile;

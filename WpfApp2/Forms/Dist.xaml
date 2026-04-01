@@ -109,7 +109,7 @@
                   CanUserResizeColumns="True"
                   CanUserSortColumns="True"
                   AlternatingRowBackground="#F9F9F9"
-                  RowHeight="35"
+                  RowHeight="45"
                   FontSize="14">
             <DataGrid.Columns>
                 <DataGridTemplateColumn Width="Auto">
@@ -124,20 +124,30 @@
                     </DataGridTemplateColumn.Header>
                 </DataGridTemplateColumn>
                 <DataGridTemplateColumn x:Name="DataStack" Width="Auto" Visibility="Collapsed">
-                    <DataGridTemplateColumn.Header>
-                        <StackPanel Margin="5">
-                            <TextBlock x:Name="TextData" Text="Введите дату" 
-                                       TextAlignment="Center" FontWeight="SemiBold" 
-                                       Foreground="#090974" Margin="0,0,0,5"/>
-                            <TextBox x:Name="InputData" Width="110" 
-                                     LostFocus="InputData_LostFocus" 
-                                     TextChanged="InputData_TextChanged" 
-                                     MaxLength="10"
-                                     PreviewTextInput="InputData_PreviewTextInput"
-                                     BorderBrush="#090974" BorderThickness="1"
-                                     FontSize="12" TextAlignment="Center"/>
-                        </StackPanel>
-                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.HeaderTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="5">
+                                <TextBlock Text="Введите дату" 
+                           TextAlignment="Center" 
+                           FontWeight="SemiBold" 
+                           Foreground="#090974" 
+                           Margin="0,0,0,5"
+                           FontSize="12"/>
+                                <TextBox x:Name="InputData" 
+                         Width="110" 
+                         LostFocus="InputData_LostFocus" 
+                         TextChanged="InputData_TextChanged" 
+                         MaxLength="10"
+                         PreviewTextInput="InputData_PreviewTextInput"
+                         KeyDown="InputData_KeyDown"
+                         BorderBrush="#090974" 
+                         BorderThickness="1"
+                         FontSize="12" 
+                         TextAlignment="Center"
+                         Height="25"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.HeaderTemplate>
                 </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>

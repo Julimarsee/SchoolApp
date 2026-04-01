@@ -1,17 +1,18 @@
-﻿using Npgsql;
+﻿
+using Npgsql;
 using System;
 using System.Data;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls.Primitives;
+using System.Text;
 
 namespace WpfApp2
 {
-    /// <summary>
-    /// Логика взаимодействия для Window1.xaml
-    /// </summary>
     public partial class MainForm : Window
     {
+        private database db = new database();
+
         public MainForm()
         {
             InitializeComponent();
@@ -27,142 +28,20 @@ namespace WpfApp2
 
         public void getData()
         {
-            if (SaveData.currentWidth == 0) this.Width = 908;
+            if (SaveData.currentWidth == 0)
+                this.Width = 1100;
 
-            database db = new database();
             var AllGrades = new allGrades();
             View.Content = AllGrades;
             SetActiveButton(AllGradesButton);
-            string Command;
-
-            string subjectsQuery = @"
-        SELECT subject_id, title
-        FROM subject
-        ORDER BY title";
-
-            DataTable subjectsTable = db.DataQuery(subjectsQuery);
-            var titles = subjectsTable.AsEnumerable()
-                .Select(row => new
-                {
-                    Title = row["title"].ToString(),
-                    IsOffset = false
-                }).ToList();
-
-            var pivotColumns = string.Join(",\n", titles.Select(s =>
-            {
-                return $@"MAX(CASE WHEN subj.title = '{s.Title}' THEN n.note ELSE NULL END) AS ""{s.Title}""";
-            }));
-
-            if (SaveData.role == "Ученик")
-            {
-                // Сначала получаем класс текущего ученика
-                string getStudentClassQuery = $@"
-            SELECT c.class_name
-            FROM person p
-            JOIN class_subject_teacher cst ON cst.teacher_id = p.person_id
-            JOIN class c ON cst.class_id = c.class_id
-            WHERE p.person_id = {SaveData.id}
-            LIMIT 1";
-
-                var classResult = db.ExecuteQuery(getStudentClassQuery);
-                string studentClass = classResult != null && classResult.Count > 0
-                    ? classResult[0]["class_name"].ToString()
-                    : "";
-
-                // Если класс не найден, пытаемся найти через оценки
-                if (string.IsNullOrEmpty(studentClass))
-                {
-                    string getClassFromNotesQuery = $@"
-                SELECT DISTINCT c.class_name
-                FROM notes n
-                JOIN class_subject_teacher cst ON n.cst_id = cst.cst_id
-                JOIN class c ON cst.class_id = c.class_id
-                WHERE n.fk_person_id = {SaveData.id}
-                LIMIT 1";
-
-                    classResult = db.ExecuteQuery(getClassFromNotesQuery);
-                    studentClass = classResult != null && classResult.Count > 0
-                        ? classResult[0]["class_name"].ToString()
-                        : "";
-                }
-
-                if (string.IsNullOrEmpty(studentClass))
-                {
-                    // Если класс все еще не найден, показываем только ученика
-                    Command = $@"
-                SELECT
-                    TRIM(CONCAT(p.last_name, ' ', p.first_name, ' ', COALESCE(p.patronymic, ''))) AS ""Ученик"",
-                    '' AS ""Класс"",
-                    {pivotColumns}
-                FROM person p
-                LEFT JOIN notes n ON n.fk_person_id = p.person_id
-                LEFT JOIN subject subj ON subj.subject_id = (
-                    SELECT s.subject_id 
-                    FROM class_subject_teacher cst 
-                    JOIN subject s ON cst.subject_id = s.subject_id 
-                    WHERE cst.cst_id = n.cst_id
-                )
-                LEFT JOIN class_subject_teacher cst ON cst.cst_id = n.cst_id
-                LEFT JOIN class c ON c.class_id = cst.class_id
-                WHERE p.rights = 'Ученик'
-                  AND p.person_id = {SaveData.id}
-                GROUP BY p.person_id, p.last_name, p.first_name, p.patronymic, c.class_name
-                ORDER BY p.last_name, p.first_name";
-                }
-                else
-                {
-                    Command = $@"
-                SELECT
-                    TRIM(CONCAT(p.last_name, ' ', p.first_name, ' ', COALESCE(p.patronymic, ''))) AS ""Ученик"",
-                    c.class_name AS ""Класс"",
-                    {pivotColumns}
-                FROM person p
-                LEFT JOIN notes n ON n.fk_person_id = p.person_id
-                LEFT JOIN subject subj ON subj.subject_id = (
-                    SELECT s.subject_id 
-                    FROM class_subject_teacher cst 
-                    JOIN subject s ON cst.subject_id = s.subject_id 
-                    WHERE cst.cst_id = n.cst_id
-                )
-                LEFT JOIN class_subject_teacher cst ON cst.cst_id = n.cst_id
-                LEFT JOIN class c ON c.class_id = cst.class_id
-                WHERE p.rights = 'Ученик'
-                  AND c.class_name = '{studentClass}'
-                GROUP BY p.person_id, p.last_name, p.first_name, p.patronymic, c.class_name
-                ORDER BY c.class_name, p.last_name, p.first_name";
-                }
-            }
-            else
-            {
-                Command = $@"
-            SELECT
-                TRIM(CONCAT(p.last_name, ' ', p.first_name, ' ', COALESCE(p.patronymic, ''))) AS ""Ученик"",
-                c.class_name AS ""Класс"",
-                {pivotColumns}
-            FROM person p
-            LEFT JOIN notes n ON n.fk_person_id = p.person_id
-            LEFT JOIN subject subj ON subj.subject_id = (
-                SELECT s.subject_id 
-                FROM class_subject_teacher cst 
-                JOIN subject s ON cst.subject_id = s.subject_id 
-                WHERE cst.cst_id = n.cst_id
-            )
-            LEFT JOIN class_subject_teacher cst ON cst.cst_id = n.cst_id
-            LEFT JOIN class c ON c.class_id = cst.class_id
-            WHERE p.rights = 'Ученик'
-            GROUP BY p.person_id, p.last_name, p.first_name, p.patronymic, c.class_name
-            ORDER BY c.class_name, p.last_name, p.first_name";
-            }
-
-            DataTable dt = db.DataQuery(Command);
-            AllGrades.SetData(dt, titles.Where(t => t.IsOffset).Select(t => t.Title).ToList());
         }
 
         private void DistGradeButton_Click(object sender, RoutedEventArgs e) => OpenDist();
 
         public void OpenDist()
         {
-            if (SaveData.role != "Ученик") this.Width = 1276;
+            if (SaveData.role != "Ученик")
+                this.Width = 1276;
             View.Content = new Dist();
             SetActiveButton(DistGradeButton);
         }
@@ -179,10 +58,12 @@ namespace WpfApp2
             var buttons = new[] { AllGradesButton, DistGradeButton, AppointButton, ProfileButton, AddButton, InfoButton };
             foreach (var btn in buttons)
             {
-                btn.IsChecked = false;
+                if (btn != null)
+                    btn.IsChecked = false;
             }
 
-            button.IsChecked = true;
+            if (button != null)
+                button.IsChecked = true;
         }
 
         private void Window_Closed(object sender, EventArgs e) =>
@@ -204,9 +85,14 @@ namespace WpfApp2
             Role.Text = SaveData.role;
             if (SaveData.role != "Администратор")
             {
-                AppointButton.Visibility = Visibility.Collapsed;
-                AddButton.Visibility = Visibility.Collapsed;
+                if (AppointButton != null)
+                    AppointButton.Visibility = Visibility.Collapsed;
+                if (AddButton != null)
+                    AddButton.Visibility = Visibility.Collapsed;
             }
+            if (SaveData.role != "Ученик") Class.Visibility = Visibility.Collapsed;
+;            Name.Text = SaveData.name;
+            Class.Text = SaveData.studentClass;
         }
 
         private void AddButton_Click(object sender, RoutedEventArgs e)
@@ -217,6 +103,11 @@ namespace WpfApp2
         }
 
         private void InfoButton_Click(object sender, RoutedEventArgs e)
+        {
+            ShowInstruction();
+        }
+
+        private void ShowInstruction()
         {
             string buttonGrade = "";
             string buttonDailyGrade = "в таблице указаны оценки по всем дисциплинам у конкретного ученика";
@@ -250,5 +141,6 @@ namespace WpfApp2
 {buttonAdd}
 ");
         }
+
     }
 }
